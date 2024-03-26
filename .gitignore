@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
-data/train
-data/test
+augmented
+runs
+__pycache__
