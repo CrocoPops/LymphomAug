@@ -4,14 +4,14 @@ import numpy as np
 import random
 from tqdm import tqdm
 import cv2
-import PIL
+from PIL import Image
 
 # CONSTANTS
 BASE_FOLDER = os.getcwd()
 IMAGE_FOLDERS = [
-    os.path.join(BASE_FOLDER, "augmented", "0"), # IMAGE_FOLDERS[0] --> Image folder of class 0
-    os.path.join(BASE_FOLDER, "augmented", "1"), # IMAGE_FOLDERS[1] --> Image folder of class 1
-    os.path.join(BASE_FOLDER, "augmented", "2"), # IMAGE_FOLDERS[2] --> Image folder of class 2
+    os.path.join(BASE_FOLDER, "data", "0"), # IMAGE_FOLDERS[0] --> Image folder of class 0
+    os.path.join(BASE_FOLDER, "data", "1"), # IMAGE_FOLDERS[1] --> Image folder of class 1
+    os.path.join(BASE_FOLDER, "data", "2"), # IMAGE_FOLDERS[2] --> Image folder of class 2
 ]
 AUGMENTATIONS_PER_CLASS = 1000
 
@@ -31,7 +31,7 @@ class RGBRotation(albumentations.ImageOnlyTransform):
         # merge the rotated RGB channels back into an image
         rotated_image_array = np.dstack((rotated_r, rotated_g, rotated_b))
 
-        return PIL.Image.fromarray(rotated_image_array.astype('uint8'), 'RGB')
+        return Image.fromarray(rotated_image_array.astype('uint8'), 'RGB')
 
 # FUNCTIONS
 def select_random_file(folder_path):
@@ -46,8 +46,15 @@ augmentations = albumentations.Compose([
     albumentations.RandomRotate90(p=0.5),
     albumentations.RandomBrightnessContrast(p=0.5),
     albumentations.ShiftScaleRotate(p=0.5),
-    # RGBRotation(p=0.5)
+    RGBRotation(p=0.5)
 ])
+
+# DELETING OLD AUGMENTED IMAGES
+for img_folder in IMAGE_FOLDERS:
+    for file in os.listdir(img_folder):
+        if file.startswith("aug"):
+            os.remove(os.path.join(img_folder, file))
+
 
 # AUGMENTING IMAGES
 for img_folder in IMAGE_FOLDERS:
