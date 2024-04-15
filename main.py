@@ -1,111 +1,131 @@
 import torch
 import os
-import optuna
 
 from tqdm import tqdm
-from torchvision import transforms, datasets
-from MyNets import AlexNet
-from torch.utils.tensorboard import SummaryWriter
+from MyNets import AlexNet, DenseNet, ResNet
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
+from constants import *
+from functions import *
 
-# Creating TensorBoard writer
-writer = SummaryWriter()
+import matplotlib.pyplot as plt
 
-# CONSTANTS
-BASE_FOLDER = os.getcwd()
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-DATA_FOLDER = os.path.join(os.getcwd(), "augmented")
-LEARNING_RATES = [0.01, 0.05, 0.001, 0.005, 0.0001, 0.0005]
-BATCH_SIZES = [32, 64, 128, 256]
-EPOCHS = [20, 30, 40, 50]
+# TRAINING LOOP
+def train(model_class, da):
 
+    model = model_class().to(DEVICE) 
 
-# TRANSFORMATION PIPELINE
-# It is used to match the AlexNet input layer
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
-
-# LOADING THE DATA
-# Using Pytorch feature that allows us to load images, divided in class, directly from the folders
-dataset = datasets.ImageFolder(DATA_FOLDER, transform=transform)
-# Splitting the data
-train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(dataset, [0.7, 0.15, 0.15])
-
-# DEFINING OBJECTIVE FUNCTION
-# Will be used by Optuna to find the best hyperparams
-def objective(trial):
-    # DEFINING TRIAL VARIABLES
-    lr = trial.suggest_categorical('lr', LEARNING_RATES)
-    batch_size = trial.suggest_categorical('batch_size', BATCH_SIZES)
-    num_epochs = trial.suggest_categorical("epochs", EPOCHS)
+    train_dataset = ImageFolder(os.path.join(TEMP_DATA, "train"), transform=TRANSFORMS)
+    val_dataset = ImageFolder(os.path.join(TEMP_DATA, "validation"), transform=TRANSFORMS)
 
     # Creating Pytorch data loaders
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    # Creating the model
-    model = AlexNet().to(DEVICE)
+    criterion = CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.0001)
 
-    # Define loss function and optimizer
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=0.0001)
+    os.makedirs(os.path.join(BASE_FOLDER, "saves"), exist_ok=True)
 
-    # TRAINING LOOP
-    bar1 = tqdm(range(num_epochs))
-    bar1.set_description(f"Trial {trial.number}")
-    for epoch in bar1:
-        model.train()
-        running_loss = 0.0
-        correct = 0
-        total = 0
-        for i, (inputs, labels) in enumerate(train_loader):
+    best_validation_accuracy = 0.0
+    train_losses = []
+    validation_losses = []
+    print(f"Training:")
+    for epoch in range(model.epochs):
+
+        # Training the network  
+        model.train() 
+        
+        # (Re-)Init stats counters
+        running_loss, total, correct = 0.0, 0, 0
+
+        for inputs, labels in train_loader:
+            
+            # Forward prop and back prop
             inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            
+            # Update the stats
             running_loss += loss.item()
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            
-        writer.add_scalar(f"Trial {trial.number} accuracy (train)", correct/total, epoch)
+        
+        train_accuracy = correct / total
+        train_losses.append(running_loss)
 
         # Evaluating the network
         model.eval()
-        correct = 0
-        total = 0
+        running_loss, correct, total = 0.0, 0, 0
         with torch.no_grad():
-            for (inputs, labels) in val_loader:
+            for inputs, labels in val_loader:
                 inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
-                outputs = model(inputs)
+                outputs = model(inputs) 
+                loss = criterion(outputs, labels)
+   
+                running_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
         val_accuracy = correct / total
-        writer.add_scalar(f"Trial {trial.number} accuracy (validation)", correct/total, epoch)
+        validation_losses.append(running_loss)
 
-        # Check if the current trial meets the pruning criteria of Optuna
-        if trial.should_prune():
-            raise optuna.exceptions.TrialPruned()
-        
-    return val_accuracy
+        print(f"({epoch}) Running loss: {running_loss:.4}, Train accuracy: {train_accuracy:.4}, Validation accuracy: {val_accuracy:.4} ")
 
-# MAIN FUNCTION
-if __name__ == "__main__":
+        if val_accuracy > best_validation_accuracy:
+            torch.save(model.state_dict(), os.path.join(BASE_FOLDER, "saves", f"{model.__class__.__name__}-{da}.pt"))
+            best_validation_accuracy = val_accuracy
 
-    # Creating Optuna study to maximize the model accuracy
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=500)
+    return train_losses, validation_losses  
 
-    # Print the best hyperparams that Optuna found
-    print("Best trial:")
-    trial = study.best_trial
-    print(f"  Value: {trial.value}")
-    print("  Params: ")
-    for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+def test_model(model_class, da):
+    model = model_class().to(DEVICE)
+    model.load_state_dict(torch.load(os.path.join(BASE_FOLDER, "saves", f"{model.__class__.__name__}-{da}.pt")))
+    test_dataset = ImageFolder(os.path.join(TEMP_DATA, "test"), transform=TRANSFORMS)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    correct, total = 0, 0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    return correct / total
+
+def plot_losses(train_losses, val_losses): 
+    plt.clf()    
+    plt.plot(train_losses)
+    plt.plot(val_losses)
+    plt.legend()
+    plt.show()
+
+# NO DATA AUGMENTATION
+init_temp_data()
+train_acc, val_acc = train(AlexNet, "None")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "None")}")
+
+# DWT AUGMENTATION
+dwt_augment_all()
+train_acc, val_acc = train(AlexNet, "DWT")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "DWT")}")
+
+# ROTATIONS, FLIP, etc
+delete_augmented()
+spatial_augment_all()
+train_acc, val_acc = train(AlexNet, "Spatial")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "Spatial")}")
+
+# COMBO
+dwt_augment_all()
+train_acc, val_acc = train(AlexNet, "Spatial")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "Spatial")}")

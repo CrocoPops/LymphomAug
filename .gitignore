@@ -1,4 +1,5 @@
 .ipynb_checkpoints/
-augmented
-runs
-__pycache__
+__pycache__/
+data/
+saves/
+temp_data/
