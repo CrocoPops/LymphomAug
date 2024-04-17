@@ -1,14 +1,19 @@
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
 import os
+from tqdm import tqdm
 import shutil
-import albumentations
-import random
-import cv2
-import numpy 
-import pywt
-
-from PIL import Image
 from constants import *
 from torch.utils.data import random_split
+import cv2
+import random
+import numpy
+from PIL import Image
+import pywt
+
+def get_dataloader(path, transform, batch_size=64, shuffle=True):
+    dataset = ImageFolder(root=path, transform=transform)
+    return DataLoader(dataset, batch_size, shuffle)
 
 def setup_folders():
     if os.path.exists(TEMP_DATA):
@@ -22,12 +27,12 @@ def split_original_data():
     for i in range(NUM_CLASSES):
         filenames = os.listdir(os.path.join(ORIGINAL_DATA, str(i)))
 
-        train, val, test = random_split(filenames, [0.7, 0.15, 0.15])
+        train, val, test = random_split(filenames, [TRAIN_PERC, VAL_PERC, TEST_PERC])
 
         for img in train:
             shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "train", str(i), img))
         for img in val:
-            shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "validation", str(i), img))
+            shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "val", str(i), img))
         for img in test:
             shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "test", str(i), img))
 
@@ -52,6 +57,11 @@ def spatial_augment_all():
     for i in range(NUM_CLASSES):
         spatial_augment_class(i)
 
+def delete_augmented():
+    for i in range(3):
+        for fn in os.listdir(os.path.join(TEMP_DATA, "train", str(i))):
+                if fn.startswith("aug_"):
+                    os.remove(os.path.join(TEMP_DATA, "train", str(i), fn))
 def fuse_images(label, filenames):
     images = [Image.open(os.path.join(TEMP_DATA, "train", str(label), fn)) for fn in filenames]
 
@@ -114,9 +124,3 @@ def dwt_augment_class(label):
 def dwt_augment_all():
     for i in range(NUM_CLASSES):
         dwt_augment_class(i)
-
-def delete_augmented():
-    for i in range(3):
-        for fn in os.listdir(os.path.join(TEMP_DATA, "train", str(i))):
-                if fn.startswith("aug_"):
-                    os.remove(os.path.join(TEMP_DATA, "train", str(i), fn))

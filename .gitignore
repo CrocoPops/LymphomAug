@@ -1,5 +1,3 @@
-.ipynb_checkpoints/
-__pycache__/
-data/
-saves/
-temp_data/
+__pycache__
+databases
+temp_data
