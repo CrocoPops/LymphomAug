@@ -1,101 +1,131 @@
 import torch
-import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
 import os
+
+from tqdm import tqdm
+from MyNets import AlexNet, DenseNet, ResNet
 from torch.utils.data import DataLoader
-from nets import AlexNet
-
-from functions import *
-import optuna
+from torchvision.datasets import ImageFolder
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
 from constants import *
+from functions import *
 
-def objective(trial):
+import matplotlib.pyplot as plt
 
+# TRAINING LOOP
+def train(model_class, da):
 
-    learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
-    batch_size = trial.suggest_categorical('batch_size', [8, 64, 256])
-    epochs = trial.suggest_categorical('epochs', [10, 20, 50, 100])
+    model = model_class().to(DEVICE) 
 
-    print("    ", "-" * 5)
-    print("")
-    print(f"TRIAL NUMBER {trial.number}")
-    print("")
-    print(f"Learning rate: {learning_rate}")
-    print(f"Weight decay:  {weight_decay}")
-    print(f"Batch size:    {batch_size}")
-    print(f"Epochs:        {epochs}")
+    train_dataset = ImageFolder(os.path.join(TEMP_DATA, "train"), transform=TRANSFORMS)
+    val_dataset = ImageFolder(os.path.join(TEMP_DATA, "validation"), transform=TRANSFORMS)
 
-    print("")
+    # Creating Pytorch data loaders
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-    train_dl = get_dataloader(TRAIN_FOLDER, BASE_TRANSFORM, batch_size)
-    val_dl = get_dataloader(VAL_FOLDER, BASE_TRANSFORM, batch_size, False)
+    criterion = CrossEntropyLoss()
+    optimizer = Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=0.0001)
 
-    model = AlexNet().to(DEVICE)
-    
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    os.makedirs(os.path.join(BASE_FOLDER, "saves"), exist_ok=True)
 
-    model.train()
-    bar = tqdm(range(epochs), ncols=100, unit="epoch", leave=False, desc=f"Epoch 0")
-    for epoch in bar:
-        bar.set_description(f"Epoch {epoch}")
-        running_loss = 0.0
-        for inputs, labels in train_dl:
+    best_validation_accuracy = 0.0
+    train_losses = []
+    validation_losses = []
+    print(f"Training:")
+    for epoch in range(model.epochs):
+
+        # Training the network  
+        model.train() 
+        
+        # (Re-)Init stats counters
+        running_loss, total, correct = 0.0, 0, 0
+
+        for inputs, labels in train_loader:
+            
+            # Forward prop and back prop
             inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item() * inputs.size(0)
-        bar.set_postfix({'running_loss': running_loss})
+            
+            # Update the stats
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        
+        train_accuracy = correct / total
+        train_losses.append(running_loss)
 
-        # Validation of the model.
+        # Evaluating the network
         model.eval()
-        correct, total = 0, 0
+        running_loss, correct, total = 0.0, 0, 0
         with torch.no_grad():
-            for inputs, labels in val_dl:
+            for inputs, labels in val_loader:
                 inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
-                outputs = model(inputs)
+                outputs = model(inputs) 
+                loss = criterion(outputs, labels)
+   
+                running_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-        accuracy = correct / total
-        trial.report(accuracy, epoch)
+        val_accuracy = correct / total
+        validation_losses.append(running_loss)
 
-        # Handle pruning based on the intermediate value.
-        if trial.should_prune():
-            raise optuna.exceptions.TrialPruned()
-        
-    print("")
-    print("    ", "-" * 5)
-    print("")
+        print(f"({epoch}) Running loss: {running_loss:.4}, Train accuracy: {train_accuracy:.4}, Validation accuracy: {val_accuracy:.4} ")
 
-    return accuracy
+        if val_accuracy > best_validation_accuracy:
+            torch.save(model.state_dict(), os.path.join(BASE_FOLDER, "saves", f"{model.__class__.__name__}-{da}.pt"))
+            best_validation_accuracy = val_accuracy
 
-os.makedirs(os.path.join(os.getcwd(), "databases"), exist_ok=True)
+    return train_losses, validation_losses  
 
-studies = ["none", "spat", "fuse", "combo"]
+def test_model(model_class, da):
+    model = model_class().to(DEVICE)
+    model.load_state_dict(torch.load(os.path.join(BASE_FOLDER, "saves", f"{model.__class__.__name__}-{da}.pt")))
+    test_dataset = ImageFolder(os.path.join(TEMP_DATA, "test"), transform=TRANSFORMS)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
-for s in studies:
-    init_temp_data()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-    if s == "spat":
-        spatial_augment_all()
-    elif s == "fuse":
-        dwt_augment_all()
-    elif s == "combo":
-        spatial_augment_all()
-        dwt_augment_all()
+    return correct / total
 
-    study = optuna.create_study(
-            storage=f"sqlite:///databases/{s}.sqlite3",  
-            study_name=s,
-            direction="maximize"
-        )
-    # Start the optimization process
-    study.optimize(objective, n_trials=30)
+def plot_losses(train_losses, val_losses): 
+    plt.clf()    
+    plt.plot(train_losses)
+    plt.plot(val_losses)
+    plt.legend()
+    plt.show()
+
+# NO DATA AUGMENTATION
+init_temp_data()
+train_acc, val_acc = train(AlexNet, "None")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "None")}")
+
+# DWT AUGMENTATION
+dwt_augment_all()
+train_acc, val_acc = train(AlexNet, "DWT")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "DWT")}")
+
+# ROTATIONS, FLIP, etc
+delete_augmented()
+spatial_augment_all()
+train_acc, val_acc = train(AlexNet, "Spatial")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "Spatial")}")
+
+# COMBO
+dwt_augment_all()
+train_acc, val_acc = train(AlexNet, "Spatial")
+print(f"Best trained AlexNet test accuracy: {test_model(AlexNet, "Spatial")}")
