@@ -1,126 +1,83 @@
-from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
-import os
+import torch
 from tqdm import tqdm
-import shutil
-from constants import *
-from torch.utils.data import random_split
-import cv2
-import random
-import numpy
-from PIL import Image
-import pywt
+from constants import DEVICE
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, random_split
+from torchvision.transforms import v2
+from torchvision.datasets import ImageFolder
+from constants import ORIGINAL_DATA
 
-def get_dataloader(path, transform, batch_size=64, shuffle=True):
-    dataset = ImageFolder(root=path, transform=transform)
-    return DataLoader(dataset, batch_size, shuffle)
+def get_data(transform):
 
-def setup_folders():
-    if os.path.exists(TEMP_DATA):
-        shutil.rmtree(TEMP_DATA)
+    if not transform:
+        transform = [v2.Resize((224, 224))]
 
-    for folder in SUBFOLDERS:
-        for i in range(NUM_CLASSES):  
-            os.makedirs(os.path.join(TEMP_DATA, folder, str(i)))
+    full_transform = v2.Compose([
+        v2.Resize((224, 224)),
+        v2.Compose(transform),
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
-def split_original_data():
-    for i in range(NUM_CLASSES):
-        filenames = os.listdir(os.path.join(ORIGINAL_DATA, str(i)))
+    dataset = ImageFolder(ORIGINAL_DATA, full_transform)
+    train_ds, val_ds, test_ds = random_split(dataset, [0.7, 0.15, 0.15])
 
-        train, val, test = random_split(filenames, [TRAIN_PERC, VAL_PERC, TEST_PERC])
+    train_dl = DataLoader(train_ds, 64, True)
+    val_dl = DataLoader(val_ds, 64, False)
+    test_dl = DataLoader(test_ds, 64, False)
 
-        for img in train:
-            shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "train", str(i), img))
-        for img in val:
-            shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "val", str(i), img))
-        for img in test:
-            shutil.copy(os.path.join(ORIGINAL_DATA, str(i), img), os.path.join(TEMP_DATA, "test", str(i), img))
+    return train_dl, val_dl, test_dl
 
-def init_temp_data():
-    setup_folders()
-    split_original_data()
+def train(model, train_dl, val_dl):
 
-def select_random_file(folder_path):
-    files = os.listdir(folder_path)
-    random_file = random.choice(files)
-    return os.path.join(folder_path, random_file)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.0001)
 
-def spatial_augment_class(label):
-    for i in range(AUGMENTATIONS_PER_CLASS):
-        img_filename = select_random_file(os.path.join(ORIGINAL_DATA, str(label)))
-        image = cv2.imread(img_filename)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        transformed = AUGMENTATIONS(image=image)["image"]
-        cv2.imwrite(os.path.join(TEMP_DATA, "train", str(label), f"aug_{i}.png"), transformed)
+    bar = tqdm(range(50), ncols=100, unit="epoch", leave=False, desc=f"Epoch 0")
+    for epoch in bar:
+        bar.set_description(f"Epoch {epoch}")
+        running_loss = 0.0
+        correct, total = 0, 0
+        model.train()
+        for inputs, labels in train_dl:
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-def spatial_augment_all():
-    for i in range(NUM_CLASSES):
-        spatial_augment_class(i)
+        accuracy = correct / total
 
-def delete_augmented():
-    for i in range(3):
-        for fn in os.listdir(os.path.join(TEMP_DATA, "train", str(i))):
-                if fn.startswith("aug_"):
-                    os.remove(os.path.join(TEMP_DATA, "train", str(i), fn))
-def fuse_images(label, filenames):
-    images = [Image.open(os.path.join(TEMP_DATA, "train", str(label), fn)) for fn in filenames]
 
-    images = [i.resize((224, 224)) for i in images]
+        # Validation of the model.
+        model.eval()
+        correct, total = 0, 0
+        with torch.no_grad():
+            for inputs, labels in val_dl:
+                inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+                outputs = model(inputs)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    num_images = len(images)
+        accuracy = correct / total
+        bar.set_postfix({'running_loss': running_loss, 'val_acc': accuracy})
 
-    # Convert the images to numpy arrays
-    images_array = [numpy.array(img) for img in images]
-
-    # Separate the RGB channels of the images
-    # [[R,G,B], [R,G,B], [R,G,B], [R,G,B]]
-    channels = [[img_arr[:,:,i] for i in range(3)] for img_arr in images_array]
-
-    # Apply the wavelet transform to each color channel
-    fused_channels = []
-    for i in range(3):
-        # [RC1, RC2, RC3, RC4]
-        coeffs = [pywt.dwt2(c[i], 'haar') for c in channels]
-        
-        cA = cV = cH = cD = 0
-        for coeff in coeffs:
-            cA += coeff[0] 
-            cV += coeff[1][0]
-            cH += coeff[1][1] 
-            cD += coeff[1][2]
-
-        cA = cA / num_images
-        cV = cV / num_images
-        cH = cH / num_images
-        cD = cD / num_images
-        
-
-        fused_coeffs = (cA, (cV, cH, cD))
-            
-        # Reconstruct the fused channel
-        fused_channel_array = pywt.idwt2(fused_coeffs, 'haar')
-        
-        # Clip values to ensure they are within 0-255 range
-        fused_channel_array = (fused_channel_array * 255 / numpy.max(fused_channel_array)).astype('uint8')
-        
-        # Append the fused channel
-        fused_channels.append(fused_channel_array)
-
-    # Combine the fused color channels into an RGB image
-    fused_image_array = numpy.stack(fused_channels, axis=-1)
-
-    # Convert array back to uint8 and create PIL image
-    return Image.fromarray(numpy.uint8(fused_image_array))
-
-def dwt_augment_class(label):
-    files = os.listdir(os.path.join(TEMP_DATA, "train", str(label)))
-    # Generating new images
-    for i in range(AUGMENTATIONS_PER_CLASS):
-        c = numpy.random.choice(files, IMG_TO_FUSE)
-        c_clean = [fn.split(".")[0] for fn in c]
-        fn = "aug_" + "-".join(c_clean) + ".png"
-        fuse_images(label, c).save(os.path.join(TEMP_DATA, "train", str(label), fn))
-
-def dwt_augment_all():
-    for i in range(NUM_CLASSES):
-        dwt_augment_class(i)
+def test(model, test_dl):
+    model.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for inputs, labels in test_dl:
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+    return correct / total

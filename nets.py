@@ -1,11 +1,11 @@
-import torchvision.models as models
+
 import torch.nn as nn
+from torchvision import models
 
 class AlexNet(nn.Module):
-    def __init__(self, num_classes=3, epochs=20):
+    def __init__(self, num_classes=3):
         super(AlexNet, self).__init__()
-        self.epochs = epochs
-
+        
         # Pretrained AlexNet
         self.model = models.alexnet(weights = models.AlexNet_Weights.DEFAULT)
 
