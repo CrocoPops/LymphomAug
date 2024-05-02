@@ -13,6 +13,13 @@ def get_data(transform):
     if not transform:
         transform = [v2.Resize((224, 224))]
 
+    baseline_transform = v2.Compose([
+        v2.Resize((224, 224)),
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
     full_transform = v2.Compose([
         v2.Resize((224, 224)),
         v2.Compose(transform),
@@ -21,8 +28,10 @@ def get_data(transform):
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = ImageFolder(ORIGINAL_DATA, full_transform)
+    dataset = ImageFolder(ORIGINAL_DATA, baseline_transform)
     train_ds, val_ds, test_ds = random_split(dataset, [0.7, 0.15, 0.15])
+
+    train_ds.transform = full_transform
 
     train_dl = DataLoader(train_ds, 64, True)
     val_dl = DataLoader(val_ds, 64, False)
