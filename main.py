@@ -1,70 +1,66 @@
 import torch
+import pywt
 
 from nets import AlexNet
 from functions import get_data, train, test
 from torchvision.transforms import v2
 import matplotlib.pyplot as plt
+from functions import *
 
-from constants import ITERATIONS, DEVICE
-from augmentations import WaveletTransform, RGBRotation, HSVRotation, HSVSwap, Posterization, ColorWarping, ChromaticAberration, ColorQuantization
+from constants import DEVICE
+from augmentations import NoneAug, RGBRotation, HSVRotation, DWTAverageFusion, DWTRandomFusion, DWTMaxFusion, DWTMinFusion
 
-augmentations = {
-    # "NoDA": [ v2.ToImage() ],
+augmentations = [
+    NoneAug,
+    RGBRotation,
+    HSVRotation,
+    DWTAverageFusion,
+    DWTRandomFusion,
+    DWTMaxFusion,
+    DWTMinFusion
+]
 
-    # "Geometric" : [
-    #     v2.RandomRotation(degrees=45),
-    #     v2.RandomHorizontalFlip(),
-    #     v2.RandomVerticalFlip(),
-    #     v2.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1), shear=15),
-   
-    # ],
+for augmentation in augmentations:
 
-    # "RGBRotation" : [  RGBRotation() ],
+    augmentation
 
-    # "HSVRotation" : [ HSVRotation() ],
+    print(f"[{augmentation.__name__}] Started augmenting the images..")
+    init_data()
+    augment_data(augmentation())
 
-    # "HSVSwap" : [ HSVSwap() ],
 
-    # "Posterization" : [ Posterization(levels= 16) ],
+    print(f"[{augmentation.__name__}] Started getting data..")
+    train_dl, val_dl, test_dl = get_data()
 
-    # "ColorWarping" : [ ColorWarping(frequency=5, amplitude=20) ],
-    # "ChromaticAberration" : [ ChromaticAberration(shift_amount=5) ],
-    # "ColorQuantization" : [ ColorQuantization(num_colors=8) ]
+    print(f"[{augmentation.__name__}] Started training..")
+    model = AlexNet().to(DEVICE)
+    results = train(model, train_dl, val_dl)
 
-    # "Watershed" : [
-    #     Watershed()
-    # ]
+    print(f"[{augmentation.__name__}] tarted testing..")
+    accuracy = round(test(model, test_dl), 2)
+    print(f"[{augmentation.__name__}] Finished testing with accuracy: {accuracy}")
 
-    "QCE" : [WaveletTransform()]
-
-}
-
-for label, trans in augmentations.items():
-
-    results = []
-
-    for i in range(ITERATIONS):
-
-        print("")
-        print(f"[{label}] Starting iteration {i + 1}")
-
-        print(f"[{label}] Started getting data..")
-        train_dl, val_dl, test_dl = get_data(trans)
-
-        print(f"[{label}] Started training..")
-        model = AlexNet().to(DEVICE)
-        train(model, train_dl, val_dl)
-
-        print(f"[{label}] tarted testing..")
-        accuracy = round(test(model, test_dl), 2)
-        print(f"[{label}] Finished testing with accuracy: {accuracy}")
-
-        results.append(accuracy)
     # Plot the results
-    plt.plot(results, label=label)
-    
-plt.xlabel('Iteration')
-plt.ylabel('Test accuracy')
-plt.title('Test accuracies of different DA techniques')
-plt.legend()
-plt.show()
+    plt.clf()
+    fig, (ax1, ax2) = plt.subplots(2)
+    fig.suptitle(augmentation.__name__)
+
+    ax1.set_ylabel('Accuracy')
+    ax1.plot(results['train']['accuracy'], label='Train accuracy')
+    ax1.plot(results['validation']['accuracy'], label='Validation accuracy')
+    ax1.legend()
+
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss')
+    ax2.plot(results['train']['loss'], label='Train loss')
+    ax2.plot(results['validation']['loss'], label='Validation loss')
+    ax2.legend()
+        
+    plt.xlabel('Epoch')
+
+    os.makedirs(os.path.join(os.getcwd(), "results", augmentation.__name__), exist_ok=True)
+
+    plt.savefig(os.path.join(os.getcwd(), "results", augmentation.__name__, "plot"))
+
+    with open(os.path.join(os.getcwd(), "results", augmentation.__name__, "test_accuracy.txt"), "w+") as file:
+        file.write(str(accuracy))
