@@ -14,7 +14,7 @@ DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 ITERATIONS = 5
 
 # DATA AUG
-AUGS_PER_CLASS = 250
+AUGS_PER_CLASS = 200
 
 # LEARNING
 EPOCHS = 10
