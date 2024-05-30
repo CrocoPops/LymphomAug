@@ -9,6 +9,8 @@ from constants import *
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
 
@@ -58,25 +60,22 @@ def select_random_file(folder_path):
     return random.choice(filenames)
 
 def augment_data(augmentation):
-
-    for label in range(NUM_CLASSES):
-        print(f"[{augmentation.__class__.__name__}] Augmenting class '{label}'")
-        bar = tqdm(range(AUGS_PER_CLASS), ncols=100, unit="image", leave=False, desc=f"Image 0")
-        for i in bar:
+    if augmentation.__class__.__name__ != "NoneAug":
+        for label in range(NUM_CLASSES):
+            print(f"[{augmentation.__class__.__name__}] Augmenting class '{label}'")
+            bar = tqdm(range(AUGS_PER_CLASS), ncols=100, unit="image", leave=False, desc=f"Image 0")
             
-            bar.set_description(f"Image {i}")
-            images = []
-            for _ in range(augmentation.args_images):
-                image_filename = select_random_file(os.path.join(AUGMENTED_FOLDER, 'train', str(label)))
-      
-                images.append(Image.open(os.path.join(AUGMENTED_FOLDER, 'train', str(label), image_filename)))
-            
-
+            for i in bar:    
+                bar.set_description(f"Image {i}")
+                images = []
+                for _ in range(augmentation.args_images):
+                    image_filename = select_random_file(os.path.join(AUGMENTED_FOLDER, 'train', str(label)))
+                    images.append(Image.open(os.path.join(AUGMENTED_FOLDER, 'train', str(label), image_filename)))
                 
-            image = augmentation(images)
-
-            image.save(os.path.join(AUGMENTED_FOLDER, 'train', str(label), f"aug_{i}.png"))
-
+                image = augmentation(images)
+                image.save(os.path.join(AUGMENTED_FOLDER, 'train', str(label), f"aug_{i}.png"))
+    else:
+        print(f"[{augmentation.__class__.__name__}] Using original dataset, no augmentation needed.")
 
 def init_data():
     create_folders()
@@ -98,6 +97,9 @@ def train(model, train_dl, val_dl):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
+
+    best_accuracy = 0.0
+    best_model_params = None
 
     train_acc = []
     train_loss = []
@@ -142,12 +144,17 @@ def train(model, train_dl, val_dl):
 
         accuracy = correct / total
 
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_model_params = model.state_dict()
+
         
         val_acc.append(accuracy)
         val_loss.append(running_loss)
 
         bar.set_postfix({'running_loss': running_loss, 'val_acc': accuracy})
 
+    model = model.load_state_dict(best_model_params)
     return {'train': {'accuracy' : train_acc, 'loss' : train_loss}, 'validation': {'accuracy' : val_acc, 'loss' : val_loss}}
 
 def test(model, test_dl):
@@ -161,3 +168,23 @@ def test(model, test_dl):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
     return correct / total
+
+def save_plot(augmentation_name, train_acc, val_acc, train_loss, val_loss, path):
+    plt.clf()
+    fig, (ax1, ax2) = plt.subplots(2)
+    fig.suptitle(augmentation_name)
+
+    ax1.set_ylabel('Accuracy')
+    ax1.plot(train_acc, label='Train accuracy')
+    ax1.plot(val_acc, label='Validation accuracy')
+    ax1.legend()
+
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss')
+    ax2.plot(train_loss, label='Train loss')
+    ax2.plot(val_loss, label='Validation loss')
+    ax2.legend()
+        
+    plt.xlabel('Epoch')
+
+    plt.savefig(path)
