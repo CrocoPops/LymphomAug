@@ -266,3 +266,109 @@ class HSVRotation:
         transformed_image = numpy.dstack((rotated_h, rotated_s, rotated_v))
 
         return Image.fromarray(transformed_image)
+
+class SaltAndPepper:
+
+    def __init__(self, prob=0.05):
+        self.salt_prob = prob
+        self.pepper_prob = prob
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+
+        image_array = numpy.array(image)
+        noisy_image = self.add_salt_and_pepper_noise(image_array, self.salt_prob, self.pepper_prob)
+
+        return Image.fromarray(noisy_image)
+
+    def add_salt_and_pepper_noise(self, image, salt_prob, pepper_prob):
+        noisy = image.copy()
+        num_salt = numpy.ceil(salt_prob * image.size)
+        num_pepper = numpy.ceil(pepper_prob * image.size)
+
+        # Add salt noise
+        coords = [numpy.random.randint(0, i - 1, int(num_salt)) for i in image.shape]
+        noisy[coords[0], coords[1], :] = 255
+
+        # Add pepper noise
+        coords = [numpy.random.randint(0, i - 1, int(num_pepper)) for i in image.shape]
+        noisy[coords[0], coords[1], :] = 0
+
+        return noisy
+    
+class ShuffleSquares:
+
+    def __init__(self, square_size=10):
+        self.square_size = square_size
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        shuffled_image = self.shuffle_squares(image_array, self.square_size)
+
+        return Image.fromarray(shuffled_image)
+
+    def shuffle_squares(self, image, square_size):
+        # Get the dimensions of the image
+        height, width = image.shape[:2]
+
+        # Calculate the number of fully covered squares along each dimension
+        num_squares_y = height // square_size
+        num_squares_x = width // square_size
+
+        # Create a list of coordinates for the fully covered squares
+        square_coords = [(i * square_size, j * square_size) for i in range(num_squares_y) for j in range(num_squares_x)]
+
+        # Create an array to store the shuffled image
+        shuffled_image = numpy.zeros_like(image)
+
+        # Create a copy of the coordinates and shuffle them
+        shuffled_coords = square_coords.copy()
+        numpy.random.shuffle(shuffled_coords)
+
+        # Place the shuffled squares into the new image
+        for orig_coord, shuf_coord in zip(square_coords, shuffled_coords):
+            orig_y, orig_x = orig_coord
+            shuf_y, shuf_x = shuf_coord
+            shuffled_image[shuf_y:shuf_y+square_size, shuf_x:shuf_x+square_size] = image[orig_y:orig_y+square_size, orig_x:orig_x+square_size]
+
+        # Copy the remaining parts (edges) that were not covered by full squares
+        if height % square_size != 0:
+            shuffled_image[num_squares_y * square_size:, :] = image[num_squares_y * square_size:, :]
+        if width % square_size != 0:
+            shuffled_image[:, num_squares_x * square_size:] = image[:, num_squares_x * square_size:]
+        if height % square_size != 0 and width % square_size != 0:
+            shuffled_image[num_squares_y * square_size:, num_squares_x * square_size:] = image[num_squares_y * square_size:, num_squares_x * square_size:]
+
+        return shuffled_image
+    
+class RandomGeometricTransform:
+
+    def __init__(self):
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        transformed_image = self.apply_random_transformations(image_array)
+
+        return Image.fromarray(transformed_image)
+
+    def apply_random_transformations(self, image):
+        # Apply random rotation
+        rotations = [0, 90, 180, 270]  # Possible rotation angles
+        rotation_angle = numpy.random.choice(rotations)
+        image = numpy.rot90(image, k=rotation_angle // 90)
+
+        # Apply random flip
+        flip_type = numpy.random.choice(['none', 'horizontal', 'vertical', 'both'])
+        if flip_type == 'horizontal':
+            image = numpy.fliplr(image)
+        elif flip_type == 'vertical':
+            image = numpy.flipud(image)
+        elif flip_type == 'both':
+            image = numpy.fliplr(numpy.flipud(image))
+
+        return image
