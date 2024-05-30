@@ -8,59 +8,60 @@ import matplotlib.pyplot as plt
 from functions import *
 
 from constants import DEVICE
-from augmentations import NoneAug, RGBRotation, HSVRotation, DWTAverageFusion, DWTRandomFusion, DWTMaxFusion, DWTMinFusion
+from augmentations import *
 
 augmentations = [
-    NoneAug,
-    RGBRotation,
-    HSVRotation,
-    DWTAverageFusion,
-    DWTRandomFusion,
-    DWTMaxFusion,
-    DWTMinFusion
+    NoneAug(),
+    RandomGeometricTransform(),
+    RGBRotation(),
+    HSVRotation(),
+    DWTAverageFusion(),
+    DWTRandomFusion(),
+    DWTMaxFusion(),
+    DWTMinFusion(),
+    SaltAndPepper(prob = 0.01),
+    ShuffleSquares(square_size=25),
 ]
+
+accuracies = {}
 
 for augmentation in augmentations:
 
-    augmentation
-
-    print(f"[{augmentation.__name__}] Started augmenting the images..")
+    # Augmenting the images
+    print(f"[{augmentation.__class__.__name__}] Started augmenting the images..")
     init_data()
-    augment_data(augmentation())
+    augment_data(augmentation)
 
-
-    print(f"[{augmentation.__name__}] Started getting data..")
+    # Splitting the dataset into train, validation and test set
+    print(f"[{augmentation.__class__.__name__}] Splitting data..")
     train_dl, val_dl, test_dl = get_data()
 
-    print(f"[{augmentation.__name__}] Started training..")
+    # Training the model
+    print(f"[{augmentation.__class__.__name__}] Started training..")
     model = AlexNet().to(DEVICE)
     results = train(model, train_dl, val_dl)
 
-    print(f"[{augmentation.__name__}] tarted testing..")
+    # Testing the model and printing the test result
+    print(f"[{augmentation.__class__.__name__}] Started testing..")
     accuracy = round(test(model, test_dl), 2)
-    print(f"[{augmentation.__name__}] Finished testing with accuracy: {accuracy}")
+    print(f"[{augmentation.__class__.__name__}] Finished testing with accuracy: {accuracy}")
+    print("")
 
     # Plot the results
-    plt.clf()
-    fig, (ax1, ax2) = plt.subplots(2)
-    fig.suptitle(augmentation.__name__)
+    save_plot(
+        augmentation.__class__.__name__,
+        results['train']['accuracy'],
+        results['validation']['accuracy'],
+        results['train']['loss'],
+        results['validation']['loss'],
+        os.path.join(os.getcwd(), "results", augmentation.__class__.__name__)       
+    )
 
-    ax1.set_ylabel('Accuracy')
-    ax1.plot(results['train']['accuracy'], label='Train accuracy')
-    ax1.plot(results['validation']['accuracy'], label='Validation accuracy')
-    ax1.legend()
+    # Save the results in the dict (will be saved at the end)
+    accuracies[augmentation.__class__.__name__] = accuracy
 
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Loss')
-    ax2.plot(results['train']['loss'], label='Train loss')
-    ax2.plot(results['validation']['loss'], label='Validation loss')
-    ax2.legend()
-        
-    plt.xlabel('Epoch')
 
-    os.makedirs(os.path.join(os.getcwd(), "results", augmentation.__name__), exist_ok=True)
-
-    plt.savefig(os.path.join(os.getcwd(), "results", augmentation.__name__, "plot"))
-
-    with open(os.path.join(os.getcwd(), "results", augmentation.__name__, "test_accuracy.txt"), "w+") as file:
-        file.write(str(accuracy))
+# Save accuracies on file
+with open(os.path.join(os.getcwd(), "results", "combined_results.txt"), "w+") as file:
+        for k,v in accuracies.items():
+             file.write(f'{k}: {v}\n')
