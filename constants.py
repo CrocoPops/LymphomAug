@@ -12,6 +12,7 @@ AUGMENTED_FOLDER = os.path.join(os.getcwd(), "augmented_data")
 NUM_CLASSES = len(os.listdir(ORIGINAL_DATA))
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 ITERATIONS = 5
+RANDOM_STATE = 22
 
 # DATA AUG
 AUGS_PER_CLASS = 200

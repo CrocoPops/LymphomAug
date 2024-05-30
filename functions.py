@@ -9,10 +9,14 @@ from constants import *
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from numpy.random import RandomState
 
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
+
+
+random.seed(RANDOM_STATE)
 
 
 def create_folders():
@@ -37,7 +41,7 @@ def split_data():
         os.makedirs(test_class_dir, exist_ok=True)
 
         images = os.listdir(class_path)
-        numpy.random.shuffle(images)
+        RandomState(RANDOM_STATE).shuffle(images)
 
         num_images = len(images)
         train_split = int(0.8 * num_images)
