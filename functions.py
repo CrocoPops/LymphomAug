@@ -1,3 +1,4 @@
+from ctypes.wintypes import DOUBLE
 import os
 import shutil
 import numpy
@@ -33,29 +34,24 @@ def split_data():
 
         class_path = os.path.join(ORIGINAL_DATA, class_folder)
         train_class_dir = os.path.join(os.path.join(AUGMENTED_FOLDER, "train"), class_folder)
-        val_class_dir = os.path.join(os.path.join(AUGMENTED_FOLDER, "validation"), class_folder)
         test_class_dir = os.path.join(os.path.join(AUGMENTED_FOLDER, "test"), class_folder)
 
         os.makedirs(train_class_dir, exist_ok=True)
-        os.makedirs(val_class_dir, exist_ok=True)
         os.makedirs(test_class_dir, exist_ok=True)
 
         images = os.listdir(class_path)
         RandomState(RANDOM_STATE).shuffle(images)
 
         num_images = len(images)
-        train_split = int(0.8 * num_images)
+        train_split = int(0.9 * num_images)
         val_split = int(0.1 * num_images)
 
         train_images = images[:train_split]
-        val_images = images[train_split:train_split + val_split]
-        test_images = images[train_split + val_split:]
+        test_images = images[train_split:]
 
         # Copy images to respective directories
         for img_name in train_images:
             shutil.copy(os.path.join(class_path, img_name), os.path.join(train_class_dir, img_name))
-        for img_name in val_images:
-            shutil.copy(os.path.join(class_path, img_name), os.path.join(val_class_dir, img_name))
         for img_name in test_images:
             shutil.copy(os.path.join(class_path, img_name), os.path.join(test_class_dir, img_name))
 
@@ -88,33 +84,26 @@ def init_data():
 def get_data():
 
     train_ds = ImageFolder(os.path.join(AUGMENTED_FOLDER, 'train'), TRANSFORM)
-    val_ds = ImageFolder(os.path.join(AUGMENTED_FOLDER, 'validation'), TRANSFORM)
     test_ds = ImageFolder(os.path.join(AUGMENTED_FOLDER, 'test'), TRANSFORM)
 
     train_dl = DataLoader(train_ds, BATCH_SIZE, True)
-    val_dl = DataLoader(val_ds, BATCH_SIZE, False)
     test_dl = DataLoader(test_ds, BATCH_SIZE, False)
 
-    return train_dl, val_dl, test_dl
+    return train_dl, test_dl
 
-def train(model, train_dl, val_dl):
+def train(model, train_dl):
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
+    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
 
-    best_accuracy = 0.0
+
     best_model_params = None
 
-    train_acc = []
-    train_loss = []
-
-    val_acc = []
-    val_loss = []
 
     bar = tqdm(range(EPOCHS), ncols=100, unit="epoch", leave=False, desc=f"Epoch 0")
     for epoch in bar:
         bar.set_description(f"Epoch {epoch}")
-        running_loss = 0.0
+        running_loss_train = 0.0
         correct, total = 0, 0
         model.train()
         for inputs, labels in train_dl:
@@ -124,42 +113,27 @@ def train(model, train_dl, val_dl):
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item() * inputs.size(0)
+            running_loss_train += loss.item() * inputs.size(0)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-        accuracy = correct / total
-        train_acc.append(accuracy)
-        train_loss.append(running_loss)
+        accuracy_train = correct / total            
+            
 
+        bar.set_postfix({'running_loss': running_loss_train, 'train_acc': accuracy_train})
 
-        # Validation of the model.
-        model.eval()
-        correct, total = 0, 0
-        with torch.no_grad():
-            for inputs, labels in val_dl:
-                inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
-                outputs = model(inputs)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                running_loss += loss.item() * inputs.size(0)
-
-        accuracy = correct / total
-
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            best_model_params = model.state_dict()
-
+        # Save the training permonance for statistical purposes
+        train_acc = accuracy_train
         
-        val_acc.append(accuracy)
-        val_loss.append(running_loss)
-
-        bar.set_postfix({'running_loss': running_loss, 'val_acc': accuracy})
+        # Save the best model of the last epoch
+        best_model_params = model.state_dict()
+    
 
     model = model.load_state_dict(best_model_params)
-    return {'train': {'accuracy' : train_acc, 'loss' : train_loss}, 'validation': {'accuracy' : val_acc, 'loss' : val_loss}}
+
+    # Return the training and validation accuracy of the best model in this iteration of training
+    return {'accuracy' : train_acc}
 
 def test(model, test_dl):
     model.eval()
@@ -171,24 +145,19 @@ def test(model, test_dl):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+    
     return correct / total
 
-def save_plot(augmentation_name, train_acc, val_acc, train_loss, val_loss, path):
+def save_plot(augmentation_name, train_acc, test_acc, path):
     plt.clf()
-    fig, (ax1, ax2) = plt.subplots(2)
+    fig, ax = plt.subplots()
     fig.suptitle(augmentation_name)
 
-    ax1.set_ylabel('Accuracy')
-    ax1.plot(train_acc, label='Train accuracy')
-    ax1.plot(val_acc, label='Validation accuracy')
-    ax1.legend()
+    ax.set_ylabel('Accuracy')
+    ax.plot(train_acc, label='Train accuracy')
+    ax.plot(test_acc, label='Test accuracy')
+    ax.legend()
 
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Loss')
-    ax2.plot(train_loss, label='Train loss')
-    ax2.plot(val_loss, label='Validation loss')
-    ax2.legend()
-        
-    plt.xlabel('Epoch')
+    plt.xlabel('Iteration')
 
-    plt.savefig(path)
+    plt.show()

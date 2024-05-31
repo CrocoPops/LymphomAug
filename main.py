@@ -20,7 +20,7 @@ augmentations = [
     DWTMaxFusion(),
     DWTMinFusion(),
     SaltAndPepper(prob = 0.01),
-    ShuffleSquares(square_size=25),
+    ShuffleSquares(square_size=25)
 ]
 
 accuracies = {}
@@ -34,31 +34,45 @@ for augmentation in augmentations:
 
     # Splitting the dataset into train, validation and test set
     print(f"[{augmentation.__class__.__name__}] Splitting data..")
-    train_dl, val_dl, test_dl = get_data()
+    train_dl, test_dl = get_data()
 
-    # Training the model
-    print(f"[{augmentation.__class__.__name__}] Started training..")
-    model = AlexNet().to(DEVICE)
-    results = train(model, train_dl, val_dl)
+    # Run n iteration of training and testing and the compute the average accuracy
+    results_iterations = {'train': {'accuracy': []}, 'test': {'accuracy': []}}
+    accuracy_DA = []
 
-    # Testing the model and printing the test result
-    print(f"[{augmentation.__class__.__name__}] Started testing..")
-    accuracy = round(test(model, test_dl), 2)
-    print(f"[{augmentation.__class__.__name__}] Finished testing with accuracy: {accuracy}")
-    print("")
+    for i in range(ITERATIONS):
+        print (f"[{augmentation.__class__.__name__}] Iteration {i+1}/{ITERATIONS}")
+        # Training the model
+        print(f"[{augmentation.__class__.__name__}] Started training..")
+        model = AlexNet().to(DEVICE)
+
+        results_train = train(model, train_dl)
+        results_iterations['train']['accuracy'].append(results_train['accuracy'])
+
+        # Testing the model and printing the test result
+        print(f"[{augmentation.__class__.__name__}] Started testing..")
+        accuracy = round(test(model, test_dl), 2)
+        accuracy_DA.append(accuracy)
+        results_iterations['test']['accuracy'].append(accuracy)
+
+        print(f"[{augmentation.__class__.__name__}] Finished testing with accuracy: {accuracy}")
+        print("")
+
+    # Compute the average accuracy of each Data Augmentation
+    accuracy_DA = round(sum(accuracy_DA) / len(accuracy_DA), 2)
+
+    print(f"[{augmentation.__class__.__name__}] Average accuracy: {accuracy_DA}")
 
     # Plot the results
     save_plot(
         augmentation.__class__.__name__,
-        results['train']['accuracy'],
-        results['validation']['accuracy'],
-        results['train']['loss'],
-        results['validation']['loss'],
+        results_iterations['train']['accuracy'],
+        results_iterations['test']['accuracy'],
         os.path.join(os.getcwd(), "results", augmentation.__class__.__name__)       
     )
 
     # Save the results in the dict (will be saved at the end)
-    accuracies[augmentation.__class__.__name__] = accuracy
+    accuracies[augmentation.__class__.__name__] = accuracy_DA
 
 
 # Save accuracies on file

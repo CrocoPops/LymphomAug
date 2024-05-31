@@ -5,7 +5,7 @@ from torchvision.transforms import v2
 
 # FOLDERS 
 ORIGINAL_DATA = os.path.join(os.getcwd(), "data")
-FOLDERS = ['train', 'validation', 'test']
+FOLDERS = ['train', 'test']
 AUGMENTED_FOLDER = os.path.join(os.getcwd(), "augmented_data")
 
 # USEFUL
@@ -18,10 +18,11 @@ RANDOM_STATE = 22
 AUGS_PER_CLASS = 200
 
 # LEARNING
-EPOCHS = 10
+EPOCHS = 30
 BATCH_SIZE = 8
 LR = 0.0001
 WD = 0.0001
+MOMENTUM = 0.7
 
 # TORCH TRANSFORM (NOT USED IN DA)
 TRANSFORM = v2.Compose([
