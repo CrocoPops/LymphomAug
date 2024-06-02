@@ -2,6 +2,7 @@ import numpy
 import random
 import pywt
 import os
+import mxnet as mx 
 from PIL import Image
 
 class NoneAug:
@@ -238,7 +239,7 @@ class RGBRotation:
         
         # rotate the RGB channels around each pixel in a clockwise direction
         rotated_r = numpy.roll(r, shift=1, axis=0) # rotate the red channel downwards by one pixel
-        rotated_g = numpy.roll(g, shift=1, axis=1) # rotate the green channel downwards by one pixel
+        rotated_g = numpy.roll(g, shift=1, axis=1) # rotate the green channel right by one pixel
         rotated_b = numpy.roll(b, shift=-1, axis=0) # rotate the blue channel upwards by one pixel
 
         # merge the rotated RGB channels back into an image
@@ -264,6 +265,36 @@ class HSVRotation:
         rotated_v = numpy.roll(v, shift=-1, axis=0)
 
         transformed_image = numpy.dstack((rotated_h, rotated_s, rotated_v))
+
+        return Image.fromarray(transformed_image)
+
+
+class HSVSwap:
+
+    def __init__(self):
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+
+        image = image.convert('HSV')
+        image_array = numpy.array(image)
+
+        h, s, v = image_array[:, :, 0], image_array[:, :, 1], image_array[:, :, 2]
+
+        # Swap the hue and saturation channels randomly
+        if numpy.random.rand() < 0.20:
+            h, s, v = v, h, s
+        elif numpy.random.rand() < 0.20:
+            h, s, v = s, v, h
+        elif numpy.random.rand() < 0.20:
+            h, s, v = s, h, v
+        elif numpy.random.rand() < 0.20:
+            h, s, v = h, v, s
+        else:
+            h, s, v = v, s, h
+
+        transformed_image = numpy.dstack((h, s, v))
 
         return Image.fromarray(transformed_image)
 
@@ -358,9 +389,9 @@ class RandomGeometricTransform:
 
     def apply_random_transformations(self, image):
         # Apply random rotation
-        rotations = [0, 90, 180, 270]  # Possible rotation angles
-        rotation_angle = numpy.random.choice(rotations)
-        image = numpy.rot90(image, k=rotation_angle // 90)
+        num_rotation = [0, 1, 2, 3] 
+        rotation_angle = numpy.random.choice(num_rotation)
+        image = numpy.rot90(image, k=rotation_angle)
 
         # Apply random flip
         flip_type = numpy.random.choice(['none', 'horizontal', 'vertical', 'both'])
@@ -372,3 +403,150 @@ class RandomGeometricTransform:
             image = numpy.fliplr(numpy.flipud(image))
 
         return image
+    
+class Rotation:
+
+    def __init__(self):
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        transformed_image = self.apply_random_transformations(image_array)
+
+        return Image.fromarray(transformed_image)
+
+    def apply_random_transformations(self, image):
+         # Apply random rotation
+        num_rotation = [0, 1, 2, 3] 
+        rotation_angle = numpy.random.choice(num_rotation)
+        image = numpy.rot90(image, k=rotation_angle)
+
+        return image
+    
+
+class Flip:
+    
+    def __init__(self):
+        self.args_images = 1
+    
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        transformed_image = self.apply_random_transformations(image_array)
+
+        return Image.fromarray(transformed_image)
+    
+    def apply_random_transformations(self, image):
+
+        # Apply random flip
+        flip_type = numpy.random.choice(['horizontal', 'vertical', 'both'])
+        if flip_type == 'horizontal':
+            image = numpy.fliplr(image)
+        elif flip_type == 'vertical':
+            image = numpy.flipud(image)
+        elif flip_type == 'both':
+            image = numpy.fliplr(numpy.flipud(image))
+        
+        return image
+    
+
+
+
+class GridColored:
+
+    def __init__(self):
+        self.num_grid_lines = 10
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        transformed_image = self.apply_grid_coloring(image_array)
+
+        return Image.fromarray(transformed_image)
+
+    def apply_grid_coloring(self, image):
+        # Get the dimensions of the image
+        height, width = image.shape[:2]
+
+        # Apply the augmentation
+        for i in range(0, self.num_grid_lines):
+            # Randomize the column to draw the line
+            column = numpy.random.randint(0, width)
+            for j in range(0, height):
+                image[j, column] = self.get_random_color()
+                
+            # Randomize the row to draw the line 
+            row = numpy.random.randint(0, height)
+            for j in range(0, width):
+                image[row, j] = self.get_random_color()
+            
+        return image
+
+    def get_random_color(self):
+        return numpy.random.randint(0, 256, 3, dtype=numpy.uint8)
+    
+
+class Brightness:
+    def __init__(self):
+        self.args_images = 1
+
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_brightness(image)
+
+        return Image.fromarray(transformed_image)
+    
+    def apply_brightness(self, image):
+        brightness = mx.image.LightingAug(alphastd=100, eigval=numpy.asarray([1,1,1]), eigvec=numpy.ones((3,3)))
+        transformed_image = brightness(image)
+        return transformed_image
+
+
+class ComboGeometricHSVRotation:
+    def __init__(self, probRot = 0.33, probFlip = 0.33, probHSV = 0.33):
+        self.args_images = 1
+        self.probRot = probRot
+        self.probFlip = probFlip
+        self.probHSV = probHSV
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        image_array = numpy.array(image)
+        transformed_image = self.apply_combo(image_array)
+
+        return transformed_image
+
+    def combo_geometric_rotation(self, image):
+        # Apply random rotation
+        if numpy.random.rand() < self.probRot:
+            num_rotation = [0, 1, 2, 3]  
+            rotation_angle = numpy.random.choice(num_rotation)
+            image = numpy.rot90(image, k=rotation_angle)
+
+        if numpy.random.rand() < self.probFlip:
+            flip_type = numpy.random.choice(['horizontal', 'vertical', 'both'])
+            if flip_type == 'horizontal':
+                image = numpy.fliplr(image)
+            elif flip_type == 'vertical':
+                image = numpy.flipud(image)
+            elif flip_type == 'both':
+                image = numpy.fliplr(numpy.flipud(image))
+
+        if numpy.random.rand() < self.probHSV:
+            image = Image.fromarray(image).convert('HSV')
+            image_array = numpy.array(image)
+
+            h, s, v = image_array[:, :, 0], image_array[:, :, 1], image_array[:, :, 2]
+
+            rotated_h = numpy.roll(h, shift=1, axis=0) 
+            rotated_s = numpy.roll(s, shift=1, axis=1) 
+            rotated_v = numpy.roll(v, shift=-1, axis=0)
+
+            image = numpy.dstack((rotated_h, rotated_s, rotated_v))
+
+        return image
+
+
+

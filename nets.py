@@ -7,7 +7,7 @@ class AlexNet(nn.Module):
         super(AlexNet, self).__init__()
         
         # Pretrained AlexNet
-        self.model = models.alexnet(weights = models.AlexNet_Weights.DEFAULT)
+        self.model = models.alexnet(weights = None, num_classes = 3)
 
         # Changing the last classification layer
         num_ftrs = self.model.classifier[6].in_features

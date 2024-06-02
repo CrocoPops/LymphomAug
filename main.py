@@ -12,15 +12,21 @@ from augmentations import *
 
 augmentations = [
     NoneAug(),
-    RandomGeometricTransform(),
+    Rotation(),
+    Flip(),
     RGBRotation(),
     HSVRotation(),
+    HSVSwap(),
     DWTAverageFusion(),
     DWTRandomFusion(),
     DWTMaxFusion(),
     DWTMinFusion(),
     SaltAndPepper(prob = 0.01),
-    ShuffleSquares(square_size=25)
+    ShuffleSquares(square_size=25),
+    GridColored(),
+    Brightness(), 
+    RandomGeometricTransform(),
+    ComboGeometricHSVRotation()
 ]
 
 accuracies = {}
@@ -37,7 +43,7 @@ for augmentation in augmentations:
     train_dl, test_dl = get_data()
 
     # Run n iteration of training and testing and the compute the average accuracy
-    results_iterations = {'train': {'accuracy': []}, 'test': {'accuracy': []}}
+    results_iterations = {'train': [], 'test': []}
     accuracy_DA = []
 
     for i in range(ITERATIONS):
@@ -47,13 +53,13 @@ for augmentation in augmentations:
         model = AlexNet().to(DEVICE)
 
         results_train = train(model, train_dl)
-        results_iterations['train']['accuracy'].append(results_train['accuracy'])
+        results_iterations['train'].append(results_train['accuracy'])
 
         # Testing the model and printing the test result
         print(f"[{augmentation.__class__.__name__}] Started testing..")
         accuracy = round(test(model, test_dl), 2)
         accuracy_DA.append(accuracy)
-        results_iterations['test']['accuracy'].append(accuracy)
+        results_iterations['test'].append(accuracy)
 
         print(f"[{augmentation.__class__.__name__}] Finished testing with accuracy: {accuracy}")
         print("")
@@ -66,8 +72,8 @@ for augmentation in augmentations:
     # Plot the results
     save_plot(
         augmentation.__class__.__name__,
-        results_iterations['train']['accuracy'],
-        results_iterations['test']['accuracy'],
+        results_iterations['train'],
+        results_iterations['test'],
         os.path.join(os.getcwd(), "results", augmentation.__class__.__name__)       
     )
 
@@ -75,7 +81,7 @@ for augmentation in augmentations:
     accuracies[augmentation.__class__.__name__] = accuracy_DA
 
 
-# Save accuracies on file
-with open(os.path.join(os.getcwd(), "results", "combined_results.txt"), "w+") as file:
-        for k,v in accuracies.items():
-             file.write(f'{k}: {v}\n')
+    # Save accuracies on file
+    with open(os.path.join(os.getcwd(), "results", "combined_results.txt"), "w+") as file:
+            for k,v in accuracies.items():
+                file.write(f'{k}: {v}\n')

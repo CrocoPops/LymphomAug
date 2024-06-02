@@ -43,8 +43,8 @@ def split_data():
         RandomState(RANDOM_STATE).shuffle(images)
 
         num_images = len(images)
-        train_split = int(0.9 * num_images)
-        val_split = int(0.1 * num_images)
+        train_split = int(0.8 * num_images)
+        test_split = int(0.2 * num_images) # line not necessary
 
         train_images = images[:train_split]
         test_images = images[train_split:]
@@ -154,10 +154,10 @@ def save_plot(augmentation_name, train_acc, test_acc, path):
     fig.suptitle(augmentation_name)
 
     ax.set_ylabel('Accuracy')
-    ax.plot(train_acc, label='Train accuracy')
-    ax.plot(test_acc, label='Test accuracy')
+    ax.plot(range(1, len(train_acc)+1), train_acc, label='Train accuracy')
+    ax.plot(range(1, len(test_acc)+1), test_acc, label='Test accuracy')
     ax.legend()
 
     plt.xlabel('Iteration')
 
-    plt.show()
+    plt.savefig(path)
