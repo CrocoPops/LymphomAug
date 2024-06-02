@@ -12,21 +12,27 @@ from augmentations import *
 
 augmentations = [
     NoneAug(),
-    Rotation(),
-    Flip(),
-    RGBRotation(),
-    HSVRotation(),
-    HSVSwap(),
     DWTAverageFusion(),
     DWTRandomFusion(),
     DWTMaxFusion(),
     DWTMinFusion(),
-    SaltAndPepper(prob = 0.01),
+    RGBRotation(),
+    HSVRotation(),
+    HSVSwap(),
+    SaltAndPepper(prob=0.01),
     ShuffleSquares(square_size=25),
-    GridColored(),
-    Brightness(), 
     RandomGeometricTransform(),
-    ComboGeometricHSVRotation()
+    Rotation(),
+    Flip(),
+    GridColored(),
+    RandomBrightness(),
+    RandomShifts(),
+    ComboGeometricBrightness(),
+    ComboBrightnessRandomShifts(),
+    ComboGeometricRGBRotation(),
+    ComboGeometricHSVRotation(),
+    ComboGeometricShift(),
+    ComboHSVShift()
 ]
 
 accuracies = {}
