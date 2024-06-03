@@ -37,6 +37,11 @@ augmentations = [
 
 accuracies = {}
 
+# Create the results folder if it does not exist
+if(not os.path.isdir(os.path.join(os.getcwd(), "results"))):
+    os.makedirs(os.path.join(os.getcwd(), "results"))
+
+
 for augmentation in augmentations:
 
     # Augmenting the images
