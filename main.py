@@ -36,10 +36,6 @@ augmentations = [
     ComboHSVShift()
 ]
 
-augmentations = [
-    
-]
-
 accuracies = {}
 
 # Create the results folder if it does not exist
