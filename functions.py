@@ -95,8 +95,8 @@ def train(model, train_dl):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WD)
-
-
+    # optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=WD)
+    scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.3, total_iters=EPOCHS)
     best_model_params = None
 
 
@@ -118,10 +118,10 @@ def train(model, train_dl):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-        accuracy_train = correct / total            
-            
+        accuracy_train = correct / total
+        scheduler.step()            
 
-        bar.set_postfix({'running_loss': running_loss_train, 'train_acc': accuracy_train})
+        bar.set_postfix({'running_loss': running_loss_train, 'train_acc': accuracy_train, 'lr': optimizer.param_groups[0]['lr']})
 
         # Save the training permonance for statistical purposes
         train_acc = accuracy_train

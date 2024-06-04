@@ -11,6 +11,7 @@ from constants import DEVICE
 from augmentations import *
 
 augmentations = [
+    ComboGeometricHSVRotation(),
     NoneAug(),
     DWTAverageFusion(),
     DWTRandomFusion(),
@@ -28,11 +29,15 @@ augmentations = [
     RandomBrightness(),
     RandomShifts(),
     ComboGeometricBrightness(),
-    ComboBrightnessRandomShifts(),
     ComboGeometricRGBRotation(),
-    ComboGeometricHSVRotation(),
+    ComboBrightnessRandomShifts(),
     ComboGeometricShift(),
+    ComboGeometricHSVRotation(),
     ComboHSVShift()
+]
+
+augmentations = [
+    
 ]
 
 accuracies = {}

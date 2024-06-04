@@ -450,9 +450,6 @@ class Flip:
         
         return image
     
-
-
-
 class GridColored:
 
     def __init__(self):
@@ -487,7 +484,6 @@ class GridColored:
     def get_random_color(self):
         return numpy.random.randint(0, 256, 3, dtype=numpy.uint8)
     
-
 class RandomBrightness:
     def __init__(self):
         self.args_images = 1
@@ -526,95 +522,259 @@ class RandomShifts:
             break
         return transformed_image
     
+# class ComboGeometricBrightness:
+#     def __init__(self):
+#         self.args_images = 1
+
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return Image.fromarray(transformed_image)
+    
+#     def apply_combo(self, image):
+#         # Apply RandomRotation and RandomBrightness
+#         image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
+#         transformed_image = RandomBrightness().apply_brightness(transformed_image)
+#         return transformed_image
+
+# class ComboBrightnessRandomShifts:
+#     def __init__(self):
+#         self.args_images = 1
+
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return Image.fromarray(transformed_image)
+    
+#     def apply_combo(self, image):
+#         # Apply RandomBrightness and RandomShifts
+#         image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomBrightness().apply_brightness(image_array))
+#         transformed_image = RandomShifts().apply_shifts(transformed_image)
+#         return transformed_image
+    
+# class ComboGeometricRGBRotation:
+#     def __init__(self):
+#         self.args_images = 1
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return transformed_image
+#     def apply_combo(self, image):
+#         # Apply RandomRotation and RGBRotation
+#         image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
+#         transformed_image = RGBRotation().__call__([transformed_image])
+#         return transformed_image
+
+# class ComboGeometricHSVRotation:
+#     def __init__(self):
+#         self.args_images = 1
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return transformed_image
+#     def apply_combo(self, image):
+#         # Apply RandomRotation and HSVRotation
+#         image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
+#         transformed_image = HSVRotation().__call__([transformed_image])
+#         return transformed_image
+    
+# class ComboGeometricShift:
+#     def __init__(self):
+#         self.args_images = 1
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return Image.fromarray(transformed_image)
+#     def apply_combo(self, image):
+#         # Apply RandomShifts and RandomGeometricTransform
+#         image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomShifts().apply_shifts(image_array))
+#         transformed_image = RandomGeometricTransform().apply_random_transformations(transformed_image)
+#         return transformed_image
+
+# class ComboHSVShift:
+#     def __init__(self):
+#         self.args_images = 1
+        
+#     def __call__(self, imgs):
+#         image = imgs[0]
+#         transformed_image = self.apply_combo(image)
+#         return transformed_image
+    
+#     def apply_combo(self, image):
+#         # Apply RandomShifts and HSVRotation
+#         # image_array = numpy.array(image)
+#         transformed_image = Image.fromarray(RandomShifts().apply_shifts(image))
+#         transformed_image = HSVRotation().__call__([transformed_image])
+#         return transformed_image
+
 class ComboGeometricBrightness:
-    def __init__(self):
+    def __init__(self, probGeo = 0.5, probBright = 0.5):
         self.args_images = 1
+        self.probGeo = probGeo
+        self.probBright = probBright
 
     def __call__(self, imgs):
         image = imgs[0]
         transformed_image = self.apply_combo(image)
-        return Image.fromarray(transformed_image)
+        return transformed_image
     
     def apply_combo(self, image):
         # Apply RandomRotation and RandomBrightness
-        image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
-        transformed_image = RandomBrightness().apply_brightness(transformed_image)
-        return transformed_image
-
-class ComboBrightnessRandomShifts:
-    def __init__(self):
-        self.args_images = 1
-
-    def __call__(self, imgs):
-        image = imgs[0]
-        transformed_image = self.apply_combo(image)
-        return Image.fromarray(transformed_image)
-    
-    def apply_combo(self, image):
-        # Apply RandomBrightness and RandomShifts
-        image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomBrightness().apply_brightness(image_array))
-        transformed_image = RandomShifts().apply_shifts(transformed_image)
+        tranformed = False
+        while not tranformed:
+            if numpy.random.rand() < self.probGeo:
+                tranformed = True
+                image_array = numpy.array(image)
+                transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
+            if numpy.random.rand() < self.probBright:
+                tranformed = True
+                transformed_image = Image.fromarray(RandomBrightness().apply_brightness(transformed_image))
+        
         return transformed_image
     
-class ComboGeometricRGBRotation:
-    def __init__(self):
+class ComboHSVShift:
+    def __init__(self, probShift = 0.5, probHSV = 0.5):
         self.args_images = 1
+        self.probShift = probShift
+        self.probHSV = probHSV
+    
     def __call__(self, imgs):
         image = imgs[0]
         transformed_image = self.apply_combo(image)
         return transformed_image
+    
     def apply_combo(self, image):
-        # Apply RandomRotation and RGBRotation
-        image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
-        transformed_image = RGBRotation().__call__([transformed_image])
+        tranformed = False
+        while not tranformed:
+            if numpy.random.rand() < self.probShift:
+                tranformed = True
+                image_array = numpy.array(image)
+                transformed_image = Image.fromarray(RandomShifts().apply_shifts(image_array))
+            if numpy.random.rand() < self.probHSV:
+                tranformed = True
+                transformed_image = HSVRotation().__call__([transformed_image])
         return transformed_image
 
 class ComboGeometricHSVRotation:
-    def __init__(self):
+    def __init__(self, probRot = 0.33, probFlip = 0.33, probHSV = 0.33):
         self.args_images = 1
-    def __call__(self, imgs):
-        image = imgs[0]
-        transformed_image = self.apply_combo(image)
-        return transformed_image
-    def apply_combo(self, image):
-        # Apply RandomRotation and HSVRotation
-        image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
-        transformed_image = HSVRotation().__call__([transformed_image])
-        return transformed_image
-    
-class ComboGeometricShift:
-    def __init__(self):
-        self.args_images = 1
-    def __call__(self, imgs):
-        image = imgs[0]
-        transformed_image = self.apply_combo(image)
-        return Image.fromarray(transformed_image)
-    def apply_combo(self, image):
-        # Apply RandomShifts and RandomGeometricTransform
-        image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomShifts().apply_shifts(image_array))
-        transformed_image = RandomGeometricTransform().apply_random_transformations(transformed_image)
-        return transformed_image
-
-class ComboHSVShift:
-    def __init__(self):
-        self.args_images = 1
+        self.probRot = probRot
+        self.probFlip = probFlip
+        self.probHSV = probHSV
         
     def __call__(self, imgs):
         image = imgs[0]
         transformed_image = self.apply_combo(image)
+
         return transformed_image
-    
+
     def apply_combo(self, image):
-        # Apply RandomShifts and HSVRotation
-        # image_array = numpy.array(image)
-        transformed_image = Image.fromarray(RandomShifts().apply_shifts(image))
-        transformed_image = HSVRotation().__call__([transformed_image])
+        transformed = False
+        while not transformed:
+            if numpy.random.rand() < self.probRot:
+                transformed = True
+                image_array = numpy.array(image)
+                transformed_image = Image.fromarray(Rotation().apply_random_transformations(image_array))
+
+            if numpy.random.rand() < self.probFlip:
+                transformed = True
+                image_array = numpy.array(transformed_image)
+                transformed_image = Image.fromarray(Flip().apply_random_transformations(image_array))
+
+            if numpy.random.rand() < self.probHSV:
+                transformed = True
+                transformed_image = HSVRotation().__call__([transformed_image])
+
         return transformed_image
+
+class ComboGeometricShift:
+    def __init__(self, probShift = 0.3, probRot = 0.33, probFlip = 0.33):
+        self.args_images = 1
+        self.probShift = probShift
+        self.probRot = probRot
+        self.probFlip = probFlip
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image)
+
+        return transformed_image
+
+    def apply_combo(self, image):
+        transformed_image = numpy.array(image)
+        trasformed = False
+        while not trasformed:
+            if numpy.random.rand() < self.probShift:
+                trasformed = True
+                transformed_image = Image.fromarray(RandomShifts().apply_shifts(transformed_image))
+
+            if numpy.random.rand() < self.probRot:
+                trasformed = True
+                transformed_image = Image.fromarray(Rotation().apply_random_transformations(transformed_image))
+
+            if numpy.random.rand() < self.probFlip:
+                trasformed = True
+                transformed_image = Image.fromarray(Flip().apply_random_transformations(transformed_image))
+
+        return transformed_image
+
+class ComboBrightnessRandomShifts:
+    def __init__(self, probBright = 0.5, probShift = 0.5):
+        self.args_images = 1
+        self.probBright = probBright
+        self.probShift = probShift
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image)
+
+        return transformed_image
+
+    def apply_combo(self, image):
+        transformed_image = numpy.array(image)
+        trasformed = False
+        while not trasformed:
+            if numpy.random.rand() < self.probBright:
+                trasformed = True
+                transformed_image = Image.fromarray(RandomBrightness().apply_brightness(transformed_image))
+
+            if numpy.random.rand() < self.probShift:
+                trasformed = True
+                transformed_image = Image.fromarray(RandomShifts().apply_shifts(transformed_image))
+
+        return transformed_image
+
+class ComboGeometricRGBRotation:
+    def __init__(self, probRot = 0.5, probGeo = 0.5):
+        self.args_images = 1
+        self.probRot = probRot
+        self.probGeo = probGeo
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image)
+
+        return transformed_image
+
+    def apply_combo(self, image):
+        transformed = False
+        while not transformed:
+            if numpy.random.rand() < self.probRot:
+                transformed = True
+                transformed_image = RGBRotation().__call__([transformed_image])
+
+            if numpy.random.rand() < self.probGeo:
+                transformed = True
+                image_array = numpy.array(transformed_image)
+                transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
+
+        return transformed_image
+
 
 # class ComboGeometricHSVRotation:
 #     def __init__(self, probRot = 0.33, probFlip = 0.33, probHSV = 0.33):
@@ -658,7 +818,6 @@ class ComboHSVShift:
 
 #             image = numpy.dstack((rotated_h, rotated_s, rotated_v))
 
-#         return image
-
+#         return Image.fromarray(image)
 
 
