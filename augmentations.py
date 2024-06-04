@@ -626,6 +626,7 @@ class ComboGeometricBrightness:
     def apply_combo(self, image):
         # Apply RandomRotation and RandomBrightness
         tranformed = False
+        transformed_image = image
         while not tranformed:
             if numpy.random.rand() < self.probGeo:
                 tranformed = True
@@ -650,6 +651,7 @@ class ComboHSVShift:
     
     def apply_combo(self, image):
         tranformed = False
+        transformed_image = image
         while not tranformed:
             if numpy.random.rand() < self.probShift:
                 tranformed = True
@@ -675,6 +677,7 @@ class ComboGeometricHSVRotation:
 
     def apply_combo(self, image):
         transformed = False
+        transformed_image = image
         while not transformed:
             if numpy.random.rand() < self.probRot:
                 transformed = True
@@ -763,6 +766,7 @@ class ComboGeometricRGBRotation:
 
     def apply_combo(self, image):
         transformed = False
+        transformed_image = image
         while not transformed:
             if numpy.random.rand() < self.probRot:
                 transformed = True
