@@ -11,12 +11,8 @@ from constants import DEVICE
 from augmentations import *
 
 augmentations = [
-    ComboGeometricHSVRotation(),
     NoneAug(),
     DWTAverageFusion(),
-    DWTRandomFusion(),
-    DWTMaxFusion(),
-    DWTMinFusion(),
     RGBRotation(),
     HSVRotation(),
     HSVSwap(),
