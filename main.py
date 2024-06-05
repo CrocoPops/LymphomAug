@@ -29,7 +29,9 @@ augmentations = [
     ComboBrightnessRandomShifts(),
     ComboGeometricShift(),
     ComboGeometricHSVRotation(),
-    ComboHSVShift()
+    ComboHSVShift(),
+    ComboGeometricGridColored(),
+    ComboGeometricShuffleSquares(square_size=25),
 ]
 
 accuracies = {}

@@ -337,11 +337,11 @@ class ShuffleSquares:
     def __call__(self, imgs):
         image = imgs[0]
         image_array = numpy.array(image)
-        shuffled_image = self.shuffle_squares(image_array, self.square_size)
+        shuffled_image = self.apply_random_transformations(image_array, self.square_size)
 
         return Image.fromarray(shuffled_image)
 
-    def shuffle_squares(self, image, square_size):
+    def apply_random_transformations(self, image, square_size):
         # Get the dimensions of the image
         height, width = image.shape[:2]
 
@@ -459,11 +459,11 @@ class GridColored:
     def __call__(self, imgs):
         image = imgs[0]
         image_array = numpy.array(image)
-        transformed_image = self.apply_grid_coloring(image_array)
+        transformed_image = self.apply_random_transformations(image_array)
 
         return Image.fromarray(transformed_image)
 
-    def apply_grid_coloring(self, image):
+    def apply_random_transformations(self, image):
         # Get the dimensions of the image
         height, width = image.shape[:2]
 
@@ -778,6 +778,96 @@ class ComboGeometricRGBRotation:
                 transformed_image = Image.fromarray(RandomGeometricTransform().apply_random_transformations(image_array))
 
         return transformed_image
+    
+
+class ComboGeometricGridColored:
+    def __init__(self, probGrid = 0.3, probRot = 0.33, probFlip = 0.33):
+        self.args_images = 1
+        self.probGrid = probGrid
+        self.probRot = probRot
+        self.probFlip = probFlip
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image)
+
+        return transformed_image
+
+    def apply_combo(self, image):
+        transformed_image = numpy.array(image)
+        trasformed = False
+        while not trasformed:
+            if numpy.random.rand() < self.probGrid:
+                trasformed = True
+                transformed_image = Image.fromarray(GridColored().apply_random_transformations(transformed_image))
+
+            if numpy.random.rand() < self.probRot:
+                trasformed = True
+                transformed_image = Image.fromarray(Rotation().apply_random_transformations(transformed_image))
+
+            if numpy.random.rand() < self.probFlip:
+                trasformed = True
+                transformed_image = Image.fromarray(Flip().apply_random_transformations(transformed_image))
+
+        return transformed_image
+
+
+
+
+class ComboGeometricGridColoredNOTALLAUG:
+    def __init__(self):
+        self.args_images = 1
+        
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image)
+
+        return transformed_image
+
+    def apply_combo(self, image):
+        transformed_image = numpy.array(image)
+        transformations = [GridColored(), Rotation(), Flip()]
+        choice = numpy.random.choice(transformations)
+        transformed_image = Image.fromarray(choice.apply_random_transformations(transformed_image))
+
+        return transformed_image
+    
+
+class ComboGeometricShuffleSquares:
+    def __init__(self, probRot = 0.33, probFlip = 0.33, probSQ = 0.33, square_size=10):
+        self.args_images = 1
+        self.probRot = probRot
+        self.probFlip = probFlip
+        self.probSQ = probSQ
+        self.square_size = square_size
+           
+    def __call__(self, imgs):
+        image = imgs[0]
+        transformed_image = self.apply_combo(image, self.square_size)
+
+        return transformed_image
+
+    def apply_combo(self, image, square_size):
+        transformed = False
+        transformed_image = image
+        while not transformed:
+            if numpy.random.rand() < self.probRot:
+                transformed = True
+                image_array = numpy.array(image)
+                transformed_image = Image.fromarray(Rotation().apply_random_transformations(image_array))
+
+            if numpy.random.rand() < self.probFlip:
+                transformed = True
+                image_array = numpy.array(transformed_image)
+                transformed_image = Image.fromarray(Flip().apply_random_transformations(image_array))
+
+            if numpy.random.rand() < self.probSQ:
+                transformed = True
+                image_array = numpy.array(transformed_image)
+                transformed_image = Image.fromarray(ShuffleSquares().apply_random_transformations(image_array, square_size))
+        return transformed_image
+
+
 
 
 # class ComboGeometricHSVRotation:
