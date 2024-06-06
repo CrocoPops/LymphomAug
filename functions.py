@@ -11,7 +11,11 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from numpy.random import RandomState
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
+from ml_things import plot_confusion_matrix
 
+
+import seaborn as sns
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
@@ -135,9 +139,53 @@ def train(model, train_dl):
     # Return the training and validation accuracy of the best model in this iteration of training
     return {'accuracy' : train_acc}
 
+
+class Metrics:
+    def __init__(self, labels, predictions):
+        self.labels = labels
+        self.predictions = predictions
+
+    def get_classification_report(self, output_dict=False):
+        return classification_report(y_true=self.labels, y_pred=self.predictions, target_names=['class 0', 'class 1', 'class 2'], output_dict=output_dict, zero_division=0)
+    
+    def get_accuracy(self):
+        return accuracy_score(self.labels, self.predictions)
+    
+    def get_confusion_matrix(self):
+        return confusion_matrix(self.labels, self.predictions, labels=[0, 1, 2], normalize=None)
+
+    def get_confusion_matrix(self):
+        return confusion_matrix(self.labels, self.predictions, normalize='all', labels=[0, 1, 2])
+    
+    def save_classification_report(self, path):
+        with open(path, 'w') as f:
+            f.write(self.get_classification_report(output_dict=False))
+
+    def save_confusion_matrix(self, path, augmentation_name):
+        # Get the confusion matrix
+        cm = self.get_confusion_matrix()
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt=".2f", cmap='Blues', xticklabels=['class 0', 'class 1', 'class 2'], yticklabels=['class 0', 'class 1', 'class 2'], ax=ax)
+
+        # Set axis labels and title
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('True')
+        ax.set_title(f"Confusion Matrix - {augmentation_name}")
+
+        # Save the plot
+        plt.savefig(path)
+        plt.close()
+    
+
+
+
 def test(model, test_dl):
     model.eval()
     correct, total = 0, 0
+    labels_forMetrics = []
+    predictions_forMetrics = []
+
     with torch.no_grad():
         for inputs, labels in test_dl:
             inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
@@ -145,8 +193,13 @@ def test(model, test_dl):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-    
-    return correct / total
+
+            labels_forMetrics.append(labels.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
+            predictions_forMetrics.append(predicted.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
+
+        metrics = Metrics(numpy.concatenate(labels_forMetrics), numpy.concatenate(predictions_forMetrics))
+
+    return metrics
 
 def save_plot(augmentation_name, train_acc, test_acc, path):
     plt.clf()
@@ -161,3 +214,11 @@ def save_plot(augmentation_name, train_acc, test_acc, path):
     plt.xlabel('Iteration')
 
     plt.savefig(path)
+
+
+
+    
+    
+    
+
+
