@@ -33,7 +33,7 @@ augmentations = [
     ComboGeometricHSVRotation(),
     #ComboHSVShift(),
     ComboGeometricGridColored(),
-    ComboGeometricShuffleSquares(square_size=25),
+    ComboGeometricShuffleSquares(square_size=25)
 ]
 
 accuracies = {}

@@ -23,7 +23,6 @@ import torch.optim as optim
 
 random.seed(RANDOM_STATE)
 
-
 def create_folders():
 
     if os.path.isdir(AUGMENTED_FOLDER):
@@ -139,6 +138,40 @@ def train(model, train_dl):
     # Return the training and validation accuracy of the best model in this iteration of training
     return {'accuracy' : train_acc}
 
+def test(model, test_dl):
+    model.eval()
+    correct, total = 0, 0
+    labels_forMetrics = []
+    predictions_forMetrics = []
+
+    with torch.no_grad():
+        for inputs, labels in test_dl:
+            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            labels_forMetrics.append(labels.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
+            predictions_forMetrics.append(predicted.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
+
+        metrics = Metrics(numpy.concatenate(labels_forMetrics), numpy.concatenate(predictions_forMetrics))
+
+    return metrics
+
+def save_plot(augmentation_name, train_acc, test_acc, path):
+    plt.clf()
+    fig, ax = plt.subplots()
+    fig.suptitle(augmentation_name)
+
+    ax.set_ylabel('Accuracy')
+    ax.plot(range(1, len(train_acc)+1), train_acc, label='Train accuracy')
+    ax.plot(range(1, len(test_acc)+1), test_acc, label='Test accuracy')
+    ax.legend()
+
+    plt.xlabel('Iteration')
+
+    plt.savefig(path)
 
 class Metrics:
     def __init__(self, labels, predictions):
@@ -176,49 +209,3 @@ class Metrics:
         # Save the plot
         plt.savefig(path)
         plt.close()
-    
-
-
-
-def test(model, test_dl):
-    model.eval()
-    correct, total = 0, 0
-    labels_forMetrics = []
-    predictions_forMetrics = []
-
-    with torch.no_grad():
-        for inputs, labels in test_dl:
-            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-
-            labels_forMetrics.append(labels.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
-            predictions_forMetrics.append(predicted.cpu().numpy()) # Move the tensor to the cpu and convert it to numpy
-
-        metrics = Metrics(numpy.concatenate(labels_forMetrics), numpy.concatenate(predictions_forMetrics))
-
-    return metrics
-
-def save_plot(augmentation_name, train_acc, test_acc, path):
-    plt.clf()
-    fig, ax = plt.subplots()
-    fig.suptitle(augmentation_name)
-
-    ax.set_ylabel('Accuracy')
-    ax.plot(range(1, len(train_acc)+1), train_acc, label='Train accuracy')
-    ax.plot(range(1, len(test_acc)+1), test_acc, label='Test accuracy')
-    ax.legend()
-
-    plt.xlabel('Iteration')
-
-    plt.savefig(path)
-
-
-
-    
-    
-    
-
-

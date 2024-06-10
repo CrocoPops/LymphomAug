@@ -1,7 +1,6 @@
 import numpy
 import random
 import pywt
-import os
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from PIL import Image
 
@@ -779,7 +778,6 @@ class ComboGeometricRGBRotation:
 
         return transformed_image
     
-
 class ComboGeometricGridColored:
     def __init__(self, probGrid = 0.3, probRot = 0.33, probFlip = 0.33):
         self.args_images = 1
@@ -811,9 +809,6 @@ class ComboGeometricGridColored:
 
         return transformed_image
 
-
-
-
 class ComboGeometricGridColoredNOTALLAUG:
     def __init__(self):
         self.args_images = 1
@@ -831,7 +826,6 @@ class ComboGeometricGridColoredNOTALLAUG:
         transformed_image = Image.fromarray(choice.apply_random_transformations(transformed_image))
 
         return transformed_image
-    
 
 class ComboGeometricShuffleSquares:
     def __init__(self, probRot = 0.33, probFlip = 0.33, probSQ = 0.33, square_size=10):
