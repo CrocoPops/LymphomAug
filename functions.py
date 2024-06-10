@@ -47,7 +47,7 @@ def split_data():
 
         num_images = len(images)
         train_split = int(0.8 * num_images)
-        test_split = int(0.2 * num_images) # line not necessary
+        test_split = int(0.2 * num_images) # line not necessary, only for clarity
 
         train_images = images[:train_split]
         test_images = images[train_split:]
