@@ -1,4 +1,4 @@
-# Lymphom Data Augmentation Project
+# Lymphoma Classification using Data Augmentation - Deep Learning Project
 In this study, we address the common challenge in medical image classification posed by limited dataset sizes, particularly in the context of Lymphoma images. Our project
 aimed to develop and evaluate new data augmentation techniques to enhance the performance of neural network classifiers. We introduced two novel algorithms that apply distinct
 transformations to the images, thereby increasing the dataset size and diversity. These transformations involved modifying image properties and introducing structured noise, enhancing
